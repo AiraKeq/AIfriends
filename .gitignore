@@ -24,3 +24,10 @@ backend/static/frontend/
 .vscode/
 .DS_Store
 Thumbs.db
+
+
+# ── 前端构建配置：只有 API 地址、没有密钥，应该进仓库 ──────────
+# 上面那条 .env.* 太宽，会把 Vite 的两个标准配置文件也挡掉；
+# 这里把它们捞回来（.env.local 之类仍然忽略）。
+!frontend/.env.development
+!frontend/.env.production
