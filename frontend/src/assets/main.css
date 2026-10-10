@@ -1,5 +1,10 @@
-@import './base.css';
+@import "tailwindcss";
+@plugin "daisyui";
 
+/* base.css 是 Vue 模板自带的设计变量（--vt-c-* 那一套）。放在 tailwind 之后：
+   让 preflight 先重置元素样式，这份再定义变量与 body 基础样式。顺序反了的话，
+   base.css 里那条 body 规则会被 preflight 盖掉。 */
+@import './base.css';
 #app {
   max-width: 1280px;
   margin: 0 auto;
