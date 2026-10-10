@@ -1,10 +1,14 @@
 @import "tailwindcss";
+@import './base.css';
 @plugin "daisyui";
 
-/* base.css 是 Vue 模板自带的设计变量（--vt-c-* 那一套）。放在 tailwind 之后：
-   让 preflight 先重置元素样式，这份再定义变量与 body 基础样式。顺序反了的话，
-   base.css 里那条 body 规则会被 preflight 盖掉。 */
-@import './base.css';
+/* 顺序说明（两处都别调）：
+   1) base.css 排在 tailwindcss 之后 —— 让 preflight 先重置元素样式，这份再
+      定义变量与 body 基础样式。反过来的话，base 里那条 body 规则会被盖掉。
+   2) @plugin 排在所有 @import 之后 —— CSS 规范要求 @import 必须出现在其他
+      at-rule 之前，而 @plugin 对解析器来说是个未知 at-rule，放它后面 IDE 会报
+      「@import 位置错误」。 */
+
 #app {
   max-width: 1280px;
   margin: 0 auto;
