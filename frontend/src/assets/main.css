@@ -9,36 +9,49 @@
       at-rule 之前，而 @plugin 对解析器来说是个未知 at-rule，放它后面 IDE 会报
       「@import 位置错误」。 */
 
-#app {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  font-weight: normal;
+/* ────────────────────────────────────────────────────────────────
+   这份文件里只准放「没有更好的地方可放」的全局样式。
+   导航栏相关的东西一律写在组件里（src/components/navbar/Navbar.vue）。
+
+   ✗ 已删掉的两条（它们正是导航栏「看着不对」的一半原因）：
+
+     #app { max-width: 1280px; margin: 0 auto; padding: 2rem; }
+       → 整个应用被限宽 1280px 又加了一圈内边距：导航栏撑不满屏，
+         左右各空一截，侧边栏也被压在容器里。
+
+     @media (min-width: 1024px) {
+       body { display: flex; place-items: center; }
+       #app { display: grid; grid-template-columns: 1fr 1fr; }
+     }
+       → 大屏时 body 变成 flex 居中、#app 裂成两列 grid，
+         抽屉侧栏和内容区会被劈进两个格子里。
+
+   ✗ 还给 <a> 加了内边距，后来也删了：那条规则没进 @layer，比 daisyUI 的组件样式
+     优先级更高，把侧栏菜单项应有的 padding-inline: 0.75rem 压成了 3px ——
+     后果是图标在圆角块里偏左、文字贴着边缘。所以下面这条必须包在 :where() 里
+     （:where 的优先级算 0，永远打不过 Tailwind 的 utility 和 daisyUI 组件）。
+
+   ✓ 保留下来的：
+     body 的字体 / 颜色 / 背景来自 base.css，留着（WelcomeItem.vue 等脚手架组件
+     还在用那些 --color-* 变量）。
+     <a> 的默认配色降到可有可无的最低优先级，只为那些没被任何 class 管到的裸链接
+     兜个底，不再影响按钮、菜单、卡片里的链接。
+   ──────────────────────────────────────────────────────────────── */
+
+:where(a) {
+  text-decoration: none;
+  color: var(--color-primary, hsla(160, 100%, 37%, 1));
 }
 
-a,
+/* 脚手架组件 HelloWorld.vue 用的就是这个类名（它不在路由里，但别删出错）
+   —— 颜色改引用 daisyUI 的 --color-primary，不再写死那个绿色。 */
 .green {
   text-decoration: none;
-  color: hsla(160, 100%, 37%, 1);
-  transition: 0.4s;
-  padding: 3px;
+  color: var(--color-primary, hsla(160, 100%, 37%, 1));
 }
 
 @media (hover: hover) {
-  a:hover {
-    background-color: hsla(160, 100%, 37%, 0.2);
-  }
-}
-
-@media (min-width: 1024px) {
-  body {
-    display: flex;
-    place-items: center;
-  }
-
-  #app {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    padding: 0 2rem;
+  :where(a):hover {
+    background-color: color-mix(in oklab, var(--color-primary, hsla(160, 100%, 37%, 1)) 20%, transparent);
   }
 }
