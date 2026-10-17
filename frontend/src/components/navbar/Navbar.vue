@@ -35,63 +35,65 @@ const DRAWER_ITEMS = [
 </script>
 
 <template>
-  <div class="flex h-dvh flex-col overflow-hidden bg-base-100">
-    <!-- 顶栏：贯穿全宽，不属于抽屉 -->
-    <nav class="navbar relative z-20 w-full shrink-0 gap-2 bg-base-100 shadow-sm">
-      <div class="navbar-start w-auto!">
-        <label for="my-drawer-4" aria-label="展开或收起侧边栏" class="btn btn-square btn-ghost btn-sm">
-          <MenuIcon />
-        </label>
-        <RouterLink :to="{ name: 'homepage-index' }" class="px-3 text-xl font-bold whitespace-nowrap">
-          <!-- 小屏把品牌字收起来：420px 宽时它和搜索框会互相挤，搜索框只剩 84px -->
-          <span class="hidden sm:inline">AIFriends</span>
-        </RouterLink>
-      </div>
-      <!-- 中间这块用 flex-1 吃掉左右剩下的空间，再让里面的搜索框居中。
-           居中必须用 justify-center，别改用子元素的 mx-auto —— 实测在 .drawer
-           这个 grid 容器里，grid 的 justify-items:start 会把这一格钉在左边，
-           auto 外边距拿不到剩余空间，搜索框会停在最左（量到 x=160，应该是 389）。 -->
-      <div class="navbar-center min-w-0 flex-1 justify-center  px-2 sm:px-6">
-        <div class="join w-full max-w-2xl">
-          <input type="search" class="input join-item w-full" placeholder="搜索你感兴趣的内容">
-          <!-- overflow-visible 不能删：<button> 自己也算 overflow:hidden 的一份子，
-               图标只要贴到边，缩放/取整时就会缺一块。图标组件里也放开了 svg 的。
-               图标与文字的间距写死成 gap-1.5（6px），别再让 btn 的默认 gap 参与。 -->
-          <button type="button" class="btn join-item gap-1.5 overflow-visible">
-            <SearchIcon />
-            搜索
-          </button>
+  <div>
+    <div class="flex h-dvh flex-col overflow-hidden bg-base-100">
+      <!-- 顶栏：贯穿全宽，不属于抽屉 -->
+      <nav class="navbar relative z-20 w-full shrink-0 gap-2 bg-base-100 shadow-sm">
+        <div class="navbar-start w-auto!">
+          <label for="my-drawer-4" aria-label="展开或收起侧边栏" class="btn btn-square btn-ghost btn-sm">
+            <MenuIcon />
+          </label>
+          <RouterLink :to="{ name: 'homepage-index' }" class="px-3 text-xl font-bold whitespace-nowrap">
+            <!-- 小屏把品牌字收起来：420px 宽时它和搜索框会互相挤，搜索框只剩 84px -->
+            <span class="hidden sm:inline">AIFriends</span>
+          </RouterLink>
         </div>
-      </div>
-      <div class="navbar-end w-auto!">
-        <RouterLink :to="{ name: 'register-index' }" class="btn btn-ghost btn-sm text-base">注册</RouterLink>
-        <RouterLink :to="{ name: 'login-index' }" class="btn btn-ghost btn-sm text-base">登录</RouterLink>
-      </div>
-    </nav>
+        <!-- 中间这块用 flex-1 吃掉左右剩下的空间，再让里面的搜索框居中。
+             居中必须用 justify-center，别改用子元素的 mx-auto —— 实测在 .drawer
+             这个 grid 容器里，grid 的 justify-items:start 会把这一格钉在左边，
+             auto 外边距拿不到剩余空间，搜索框会停在最左（量到 x=160，应该是 389）。 -->
+        <div class="navbar-center min-w-0 flex-1 justify-center  px-2 sm:px-6">
+          <div class="join w-full max-w-2xl">
+            <input type="search" class="input join-item w-full" placeholder="搜索你感兴趣的内容">
+            <!-- overflow-visible 不能删：<button> 自己也算 overflow:hidden 的一份子，
+                 图标只要贴到边，缩放/取整时就会缺一块。图标组件里也放开了 svg 的。
+                 图标与文字的间距写死成 gap-1.5（6px），别再让 btn 的默认 gap 参与。 -->
+            <button type="button" class="btn join-item gap-1.5 overflow-visible">
+              <SearchIcon />
+              搜索
+            </button>
+          </div>
+        </div>
+        <div class="navbar-end w-auto!">
+          <RouterLink :to="{ name: 'register-index' }" class="btn btn-ghost btn-sm text-base">注册</RouterLink>
+          <RouterLink :to="{ name: 'login-index' }" class="btn btn-ghost btn-sm text-base">登录</RouterLink>
+        </div>
+      </nav>
 
-    <!-- 抽屉：只占顶栏下面剩下的高度 -->
-    <div class="drawer min-h-0 flex-1 lg:drawer-open">
-      <input id="my-drawer-4" type="checkbox" class="drawer-toggle">
-      <div class="drawer-content flex min-h-0 flex-col">
-        <main class="min-h-0 flex-1 overflow-y-auto">
-          <slot></slot>
-        </main>
-      </div>
-      <div class="drawer-side z-30 max-lg:top-16 max-lg:h-[calc(100dvh-4rem)] lg:h-full is-drawer-close:overflow-visible">
-        <label for="my-drawer-4" aria-label="收起侧边栏" class="drawer-overlay"></label>
-        <div class="flex min-h-full flex-col bg-base-200 is-drawer-close:w-18 is-drawer-open:w-54">
-          <ul class="menu w-full grow">
-            <li v-for="item in DRAWER_ITEMS" :key="item.name">
-              <RouterLink
-                :to="{ name: item.name }"
-                class="is-drawer-close:tooltip is-drawer-close:tooltip-right lg:is-drawer-close:tooltip lg:is-drawer-close:tooltip-open lg:is-drawer-close:tooltip-right min-h-12"
-                :data-tip="item.label"
-              >
-                <component :is="item.icon" />
-                <span class="is-drawer-close:hidden ml-1 whitespace-nowrap">{{ item.label }}</span>
-              </RouterLink>
-            </li>
-          </ul>
+      <!-- 抽屉：只占顶栏下面剩下的高度 -->
+      <div class="drawer min-h-0 flex-1 lg:drawer-open">
+        <input id="my-drawer-4" type="checkbox" class="drawer-toggle">
+        <div class="drawer-content flex min-h-0 flex-col">
+          <main class="min-h-0 flex-1 overflow-y-auto">
+            <slot></slot>
+          </main>
+        </div>
+        <div class="drawer-side z-30 max-lg:top-16 max-lg:h-[calc(100dvh-4rem)] lg:h-full is-drawer-close:overflow-visible">
+          <label for="my-drawer-4" aria-label="收起侧边栏" class="drawer-overlay"></label>
+          <div class="flex min-h-full flex-col bg-base-200 is-drawer-close:w-18 is-drawer-open:w-54">
+            <ul class="menu w-full grow">
+              <li v-for="item in DRAWER_ITEMS" :key="item.name">
+                <RouterLink
+                  :to="{ name: item.name }"
+                  class="is-drawer-close:tooltip is-drawer-close:tooltip-right lg:is-drawer-close:tooltip lg:is-drawer-close:tooltip-open lg:is-drawer-close:tooltip-right min-h-12"
+                  :data-tip="item.label"
+                >
+                  <component :is="item.icon" />
+                  <span class="is-drawer-close:hidden ml-1 whitespace-nowrap">{{ item.label }}</span>
+                </RouterLink>
+              </li>
+            </ul>
+          </div>
         </div>
       </div>
     </div>

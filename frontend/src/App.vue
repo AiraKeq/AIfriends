@@ -4,6 +4,6 @@ import Navbar from "@/components/navbar/Navbar.vue";
 
 <template>
   <Navbar>
-  你好
+    <RouterView />
   </Navbar>
 </template>
