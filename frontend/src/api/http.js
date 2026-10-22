@@ -61,7 +61,9 @@ http.interceptors.response.use(
     const status = response?.status
 
     const isRefreshCall = (config?.url || '').includes('/auth/refresh/')
-    if (status !== 401 || config?._retry || isRefreshCall) {
+    // 登录失败应直接交给表单显示，不能触发 token 刷新和页面重载。
+    const isLoginCall = (config?.url || '').includes('/auth/login/')
+    if (status !== 401 || config?._retry || isRefreshCall || isLoginCall) {
       return Promise.reject(error)
     }
 
