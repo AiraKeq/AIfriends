@@ -145,9 +145,10 @@ REST_FRAMEWORK = {
     ),
 }
 
+#simpleJWT配置
 SIMPLE_JWT = {
     # dual-token：access 短命（拿去请求），refresh 长命（只拿去换 access）
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=30),
+    'ACCESS_TOKEN_LIFETIME': timedelta(hours=2),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
     # 每次 refresh 换回一对新的，旧 refresh 立刻拉黑 —— 泄露的 refresh 只能用一次
     'ROTATE_REFRESH_TOKENS': True,

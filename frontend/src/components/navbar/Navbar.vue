@@ -25,7 +25,11 @@ import HomepageIcon from "@/components/navbar/icons/HomepageIcon.vue";
 import FriendIcon from "@/components/navbar/icons/FriendIcon.vue";
 import CreateIcon from "@/components/navbar/icons/CreateIcon.vue";
 import SearchIcon from "@/components/navbar/icons/SearchIcon.vue";
+import {useRouter} from "vue-router";
+import {useUserStore} from "@/stores/user.js";
+import UserMenu from "@/components/navbar/UserMenu.vue";
 
+const user = useUserStore()
 // 侧栏三个入口：路径、图标、文案、折叠时的提示语
 const DRAWER_ITEMS = [
   { name: "homepage-index", label: "首页", icon: HomepageIcon },
@@ -65,8 +69,14 @@ const DRAWER_ITEMS = [
           </div>
         </div>
         <div class="navbar-end w-auto!">
-          <RouterLink :to="{ name: 'register-index' }" class="btn btn-ghost btn-sm text-base">注册</RouterLink>
-          <RouterLink :to="{ name: 'login-index' }" class="btn btn-ghost btn-sm text-base">登录</RouterLink>
+          <RouterLink v-if="user.isLogin()" :to="{name: 'create-index'}" active-class="btn-active" class="btn btn-ghost text-base mr-6">
+            <CreateIcon />
+            创作
+          </RouterLink>
+          <RouterLink v-if="!user.isLogin()"  :to="{name: 'user-account-login-index'}" active-class="btn-active" class="btn btn-ghost btn-sm text-base">
+            登录
+          </RouterLink>
+          <UserMenu v-else />
         </div>
       </nav>
 

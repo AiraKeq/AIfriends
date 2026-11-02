@@ -17,7 +17,7 @@ const router = createRouter({
     { path: '/login', component: LoginIndex, name: 'login-index' },
     { path: '/register', component: RegisterIndex, name: 'register-index' },
     { path: '/user/space/:user_id', component: SpaceIndex, name: 'user-space-index' },
-    { path: '/profile', component: ProfileIndex, name: 'profile-index' },
+    { path: '/profile', component: ProfileIndex, name: 'user-profile-index' },
     { path: '/:pathMatch(.*)*', component: NotFoundIndex, name: 'not-found' },
   ],
 })
