@@ -1,3 +1,4 @@
+from web.views.user.account.get_user_info import GetUserInfoView
 from .api_views import RefreshView, LogoutView
 from web.views.user.account.login import LoginViews
 from django.urls import path
@@ -9,6 +10,7 @@ urlpatterns = [
     path('api/user/account/logout/',LogoutView.as_view()),
     path('api/user/account/register/', RegisterView.as_view()),
     path('api/user/account/refresh_token/',RefreshView.as_view()),
+    path('api/user/account/get_user_info/',GetUserInfoView.as_view()),
 
     path('',index)
 ]

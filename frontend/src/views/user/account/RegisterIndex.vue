@@ -2,27 +2,45 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import {useUserStore} from "@/stores/user.js";
+import api from "@/js/http/api.js";
 
 const auth = useAuthStore()
 const router = useRouter()
 const username = ref('')
 const password = ref('')
-const error = ref('')
+const passwordConfirm = ref('')
+const errorMessage = ref('')
 
-async function submit() {
-  if (auth.loading) return
-  error.value = ''
-  try {
-    await auth.login(username.value, password.value)
-    await router.replace({ name: 'homepage-index' })
-  } catch (e) {
-    const data = e.response?.data
-    if (data?.detail) {
-      error.value = data.detail
-    } else if (data && typeof data === 'object') {
-      error.value = Object.values(data).flat().join(' ')
-    } else {
-      error.value = '登录失败，请检查网络连接后重试'
+const user = useUserStore()
+
+async function handleRegister() {
+  errorMessage.value = ''
+  if (!username.value.trim()){
+    errorMessage.value = '用户名不能为空'
+  }else if(!password.value.trim()){
+    errorMessage.value = '密码不能为空'
+  }else if(password.value.trim() !==passwordConfirm.value.trim()){
+    errorMessage.value = '两次输入的密码不一样'
+  }else{
+    try {
+      const res = await api.post('/api/user/account/register/',{
+        username: username.value,
+        password: password.value,
+      })
+      const data = res.data
+      if(data.result==='success'){
+        user.setAccessToken(data.access)
+        user.setUserInfo(data)
+        await router.push({
+          name: 'homepage-index'
+        })
+      }else{
+        errorMessage.value = data.result
+      }
+    }catch(err){
+      console.log(err)
+      errorMessage.value = '注册请求失败，请稍后重试'
     }
   }
 }
@@ -32,7 +50,7 @@ async function submit() {
   <div class="login-index">
     <!-- 把 mt-[100px] 换成 pt-[100px] -->
     <div class="flex justify-center pt-[100px]">
-      <form @submit.prevent="submit">
+      <form @submit.prevent="handleRegister" novalidate>
         <fieldset class="fieldset bg-base-200 border-base-300 rounded-box w-xs border p-4">
           <legend class="fieldset-legend text-xl font-semibold">注册</legend>
 
@@ -43,10 +61,11 @@ async function submit() {
           <input v-model="password" type="password" class="input" placeholder="密码" autocomplete="current-password" required />
 
           <label class="label">确认密码</label>
-          <input v-model="password" type="password" class="input" placeholder="确认密码" autocomplete="current-password" required />
+          <input v-model="passwordConfirm
+ " type="password" class="input" placeholder="确认密码" autocomplete="current-password" required />
 
 
-          <p v-if="error" role="alert" class="text-error">{{ error }}</p>
+          <p v-if="errorMessage" role="alert" class="text-sm text-red-500 mt-1">{{ errorMessage }}</p>
           <button type="submit" class="btn btn-neutral mt-4" :disabled="auth.loading">
             {{ auth.loading ? '注册中…' : '注册' }}
           </button>

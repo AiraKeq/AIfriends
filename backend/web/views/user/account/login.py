@@ -17,14 +17,14 @@ class LoginViews(APIView):
             from django.contrib.auth import authenticate
             user=authenticate(username=username, password=password)
             if user :
-                user_profile = UserProfile.objects.get(username=username)
+                user_profile = UserProfile.objects.get(user=user)
                 refresh = RefreshToken.for_user(user)
                 response = Response({
                     'result':'success',
                     'access':str(refresh.access_token),
                     'user_id':user.id,
                     'username':user.username,
-                    'photo':user_profile.photo.url,
+                    'photo': request.build_absolute_uri(user_profile.photo.url),
                     'profile':user_profile.profile,
                 })
                 response.set_cookie(
