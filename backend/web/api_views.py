@@ -38,23 +38,28 @@ REFRESH_MAX_AGE = 7 * 24 * 3600
 
 
 def _set_refresh_cookie(response, refresh_token):
-    """把 refresh token 放进 httpOnly cookie。
-
-    为什么不全放 localStorage:
-      access 放 localStorage 是常见做法(它只活 30 分钟);
-      refresh 一旦被 JS 读走,就等于把「7 天的登录态」交出去了。
-      httpOnly 的 cookie JS 读不到,XSS 也偷不走。
-    """
+    """登录、刷新和退出时使用一致的 Cookie 路径。"""
     cookie_kwargs = {
         'httponly': True,
         'samesite': 'Lax',
-        'secure': False,          # 上线(HTTPS)时改成 True
-        'path': '/api/auth/',
+        'secure': not settings.DEBUG,
+        'path': '/api/',
     }
+
     if refresh_token is None:
-        response.delete_cookie(TOKEN_COOKIE)
+        response.delete_cookie(
+            TOKEN_COOKIE,
+            path='/api/',
+            samesite='Lax',
+        )
     else:
-        response.set_cookie(TOKEN_COOKIE, refresh_token, max_age=REFRESH_MAX_AGE, **cookie_kwargs)
+        response.set_cookie(
+            TOKEN_COOKIE,
+            refresh_token,
+            max_age=REFRESH_MAX_AGE,
+            **cookie_kwargs,
+        )
+
     return response
 
 

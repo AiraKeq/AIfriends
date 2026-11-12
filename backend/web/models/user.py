@@ -12,7 +12,7 @@ def photo_path(instance, filename):
 
 class UserProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
-    photo = models.ImageField(default='user/photos/default.png', upload_to='photo_upload_to')
+    photo = models.ImageField(default='user/photos/default.png', upload_to=photo_path)
     profile = models.TextField(default='谢谢你的关注',max_length=500)
     create_time = models.DateTimeField(default=now)
     update_time = models.DateTimeField(default=now)

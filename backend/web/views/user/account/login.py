@@ -1,8 +1,10 @@
 from rest_framework.views import  APIView
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
+from django.conf import settings
 
 from web.models.user import UserProfile
+from web.views.utils.cookie import clear_legacy_refresh_cookie
 
 
 class LoginViews(APIView):
@@ -32,10 +34,11 @@ class LoginViews(APIView):
                     value=str(refresh),
                     httponly=True,
                     samesite='Lax',
-                    secure=True,
+                    secure=not settings.DEBUG,
                     max_age=86400 * 7,
+                    path='/api/',
                 )
-                return response
+                return clear_legacy_refresh_cookie(response)
             return Response({
                 'result':'用户名或密码错误',
             })

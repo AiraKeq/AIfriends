@@ -9,13 +9,13 @@ class GetUserInfoView(APIView):
     permission_classes = [IsAuthenticated]
     def get(self,request):
         try:
-            user = request.uesr
+            user = request.user
             user_profile = UserProfile.objects.get(user=user)
             return Response({
                 'result':'success',
                 'user_id':user.id,
                 'username':user.username,
-                'photo':user_profile.photo.url,
+                'photo': request.build_absolute_uri(user_profile.photo.url),
                 'profile':user_profile.profile,
             })
         except:

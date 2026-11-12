@@ -1,9 +1,11 @@
 from rest_framework import status
+from django.conf import settings
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from web.models.user import UserProfile
+from web.views.utils.cookie import clear_legacy_refresh_cookie
 from django.contrib.auth.models import User
 
 
@@ -36,10 +38,11 @@ class RegisterView(APIView):
                 value=str(refresh),
                 httponly=True,
                 samesite='Lax',
-                secure=True,
+                secure=not settings.DEBUG,
                 max_age=86400 * 7,
+                path='/api/',
             )
-            return response
+            return clear_legacy_refresh_cookie(response)
         except:
             return Response({
                 'result':'系统异常，请稍后重试'

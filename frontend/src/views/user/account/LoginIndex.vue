@@ -34,8 +34,8 @@ async function handleLogin(){
       }else{
         errorMessage.value = data.result
       }
-    }catch(err){
-      console.log(err)
+    }catch{
+      errorMessage.value = '登录请求失败，请稍后重试'
     }
   }
 }
@@ -56,7 +56,7 @@ async function handleLogin(){
             <input v-model="password" type="password" class="input" placeholder="密码" autocomplete="current-password" required />
 
             <p v-if="errorMessage" class="text-sm text-red-500 mt-1">{{ errorMessage }}</p>
-            <button @class="handleLogin" class="btn btn-neutral mt-4">登录</button>
+            <button type="submit" class="btn btn-neutral mt-4">登录</button>
             <div class="flex justify-end">
               <RouterLink :to="{name:'register-index'}" class="btn btn-sm btn-ghost text-gray-500">
                 注册

@@ -5,12 +5,13 @@ import CreateIndex from "@/views/create/CreateIndex.vue"
 import LoginIndex from "@/views/user/account/LoginIndex.vue"
 import RegisterIndex from "@/views/user/account/RegisterIndex.vue"
 import SpaceIndex from "@/views/user/space/SpaceIndex.vue"
-import ProfileIndex from "@/views/profile/ProfileIndex.vue"
+import ProfileIndex from "@/views/user/profile/ProfileIndex.vue"
 import NotFoundIndex from "@/views/error/NotFoundIndex.vue"
 import {useUserStore} from "@/stores/user.js"
 
 const router = createRouter({
-  history: createWebHistory(import.meta.env.BASE_URL),
+
+  history: createWebHistory('/'),
   routes: [
     {
       path: '/',
@@ -80,13 +81,20 @@ const router = createRouter({
 })
 
 router.beforeEach((to) => {
-  const user = useUserStore()
-  if(to.meta.needLogin && user.setHasPulledUserInfo && !user.isLogin()) {
-    return{
-      name :  'login-index'
+    const user = useUserStore()
+
+    // 登录恢复完成后，才判断是否需要跳转到登录页
+    if (
+        to.meta.needLogin &&
+        user.hasPulledUserInfo &&
+        !user.isLogin()
+    ) {
+        return {
+            name: 'login-index',
+        }
     }
-  }
-  return true
+
+    return true
 })
 
 export default router

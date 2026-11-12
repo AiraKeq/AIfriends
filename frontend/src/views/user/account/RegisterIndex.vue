@@ -1,11 +1,10 @@
 <script setup>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { useAuthStore } from '@/stores/auth'
 import {useUserStore} from "@/stores/user.js";
 import api from "@/js/http/api.js";
 
-const auth = useAuthStore()
+const isSubmitting = ref(false)
 const router = useRouter()
 const username = ref('')
 const password = ref('')
@@ -15,6 +14,7 @@ const errorMessage = ref('')
 const user = useUserStore()
 
 async function handleRegister() {
+  if (isSubmitting.value) return
   errorMessage.value = ''
   if (!username.value.trim()){
     errorMessage.value = '用户名不能为空'
@@ -23,6 +23,7 @@ async function handleRegister() {
   }else if(password.value.trim() !==passwordConfirm.value.trim()){
     errorMessage.value = '两次输入的密码不一样'
   }else{
+    isSubmitting.value = true
     try {
       const res = await api.post('/api/user/account/register/',{
         username: username.value,
@@ -38,9 +39,10 @@ async function handleRegister() {
       }else{
         errorMessage.value = data.result
       }
-    }catch(err){
-      console.log(err)
+    }catch{
       errorMessage.value = '注册请求失败，请稍后重试'
+    } finally {
+      isSubmitting.value = false
     }
   }
 }
@@ -61,13 +63,12 @@ async function handleRegister() {
           <input v-model="password" type="password" class="input" placeholder="密码" autocomplete="current-password" required />
 
           <label class="label">确认密码</label>
-          <input v-model="passwordConfirm
- " type="password" class="input" placeholder="确认密码" autocomplete="current-password" required />
+          <input v-model="passwordConfirm" type="password" class="input" placeholder="确认密码" autocomplete="current-password" required />
 
 
           <p v-if="errorMessage" role="alert" class="text-sm text-red-500 mt-1">{{ errorMessage }}</p>
-          <button type="submit" class="btn btn-neutral mt-4" :disabled="auth.loading">
-            {{ auth.loading ? '注册中…' : '注册' }}
+          <button type="submit" class="btn btn-neutral mt-4" :disabled="isSubmitting">
+            {{ isSubmitting ? '注册中…' : '注册' }}
           </button>
           <div class="flex justify-end">
             <RouterLink :to="{name:'login-index'}" class="btn btn-sm btn-ghost text-gray-500">

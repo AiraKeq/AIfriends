@@ -11,7 +11,10 @@
 import axios from "axios"
 import {useUserStore} from "@/stores/user.js";
 
-const BASE_URL = 'http://127.0.0.1:8000'
+// 开发时沿用页面主机名，避免 localhost 与 127.0.0.1 跨站；构建后与 Django 同源。
+const BASE_URL = import.meta.env.DEV
+    ? `${window.location.protocol}//${window.location.hostname}:8000`
+    : window.location.origin
 
 const api = axios.create({
     baseURL: BASE_URL,
