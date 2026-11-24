@@ -90,8 +90,8 @@ http.interceptors.response.use(
     } catch (refreshError) {
       // refresh 也过期/被拉黑了 —— 真的该重新登录
       tokenStore.clear()
-      if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
-        window.location.replace('/login')
+      if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/user/account/login/')) {
+        window.location.replace('/user/account/login/')
       }
       return Promise.reject(refreshError)
     }

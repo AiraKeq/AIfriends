@@ -26,7 +26,7 @@ onMounted(async () => {
         // 登录恢复结束后，再决定是否跳转
         if (route.meta.needLogin && !user.isLogin()) {
             await router.replace({
-                name: 'login-index',
+                name: 'user-account-login-index',
             })
         }
     }

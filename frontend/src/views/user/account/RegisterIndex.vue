@@ -71,7 +71,7 @@ async function handleRegister() {
             {{ isSubmitting ? '注册中…' : '注册' }}
           </button>
           <div class="flex justify-end">
-            <RouterLink :to="{name:'login-index'}" class="btn btn-sm btn-ghost text-gray-500">
+            <RouterLink :to="{name:'user-account-login-index'}" class="btn btn-sm btn-ghost text-gray-500">
               登录
             </RouterLink>
           </div>

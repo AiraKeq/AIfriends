@@ -20,9 +20,9 @@ class GetOrCreateFriendView(APIView):
             else:
                 friend = Friend.objects.create(character_id=character_id,me=user_profile)
             character = friend.character
-            author = friend.author
+            author = character.author
             return Response({
-                'result':'succcess',
+                'result':'success',
                 'friend':{
                     'id':friend.id,
                     'character':{

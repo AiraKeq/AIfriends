@@ -96,7 +96,7 @@ function handleSearch(){
                中间有一瞬 isLogin() 为 true 而 id 还是 undefined。
                UserMenu 里的 RouterLink 要 params.user_id，拿到 undefined 会让
                vue-router 抛 "Missing required param"，整个 Navbar 渲染中断。 -->
-          <RouterLink v-if="!user.isLogin()"  :to="{name: 'login-index'}" active-class="btn-active" class="btn btn-ghost btn-sm text-base">
+          <RouterLink v-if="!user.isLogin()"  :to="{name: 'user-account-login-index'}" active-class="btn-active" class="btn btn-ghost btn-sm text-base">
             登录
           </RouterLink>
           <UserMenu v-if="user.isLogin() && user.id" />

@@ -116,7 +116,7 @@ watch(currentId, (id) => loadDetail(id))
 
       <div class="me">
         <span>{{ auth.user?.username || '…' }}</span>
-        <button @click="auth.logout().then(() => router.push('/login'))">退出</button>
+        <button @click="auth.logout().then(() => router.push('/user/account/login/'))">退出</button>
       </div>
     </aside>
 

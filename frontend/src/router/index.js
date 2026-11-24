@@ -23,7 +23,7 @@ const router = createRouter({
       }
     },
     {
-      path: '/friend',
+      path: '/friend/',
       component: FriendIndex,
       name: 'friend-index',
       meta:{
@@ -32,7 +32,7 @@ const router = createRouter({
     },
     {
       // 创建角色页直接渲染在创作首页（和教程一致）
-      path: '/create',
+      path: '/create/',
       component: CreateIndex,
       name: 'create-index' ,
       meta:{
@@ -40,7 +40,7 @@ const router = createRouter({
       }
     },
     {
-      path: '/create/character/update/:character_id',
+      path: '/create/character/update/:character_id/',
       component: UpdateCharacter,
       name: 'update-character',
       meta:{
@@ -48,23 +48,23 @@ const router = createRouter({
       }
     },
     {
-      path: '/login',
+      path: '/user/account/login/',
       component: LoginIndex,
-      name: 'login-index',
+      name: 'user-account-login-index',
       meta:{
         needLogin : false
       }
     },
     {
-      path: '/register',
+      path: '/user/account/register/',
       component: RegisterIndex,
-      name: 'register-index',
+      name: 'user-account-register-index',
       meta:{
         needLogin : false
       }
     },
     {
-      path: '/user/space/:user_id',
+      path: '/user/space/:user_id/',
       component: SpaceIndex,
       name: 'user-space-index',
       meta:{
@@ -72,7 +72,7 @@ const router = createRouter({
       }
     },
     {
-      path: '/profile',
+      path: '/user/profile/',
       component: ProfileIndex,
       name: 'user-profile-index',
       meta:{
@@ -83,6 +83,15 @@ const router = createRouter({
       path: '/404/',
       component: NotFoundIndex,
       name: '404',
+      meta:{
+        needLogin : false
+      }
+    },
+    {
+      // 兜底：没匹配上的路径统一交给 404 页面，避免访问 /homepage 这类地址时白屏
+      path: '/:pathMatch(.*)*',
+      component: NotFoundIndex,
+      name: 'not-found',
       meta:{
         needLogin : false
       }
@@ -100,7 +109,7 @@ router.beforeEach((to) => {
         !user.isLogin()
     ) {
         return {
-            name: 'login-index',
+            name: 'user-account-login-index',
         }
     }
 
