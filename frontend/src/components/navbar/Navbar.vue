@@ -25,17 +25,35 @@ import HomepageIcon from "@/components/navbar/icons/HomepageIcon.vue";
 import FriendIcon from "@/components/navbar/icons/FriendIcon.vue";
 import CreateIcon from "@/components/navbar/icons/CreateIcon.vue";
 import SearchIcon from "@/components/navbar/icons/SearchIcon.vue";
-import {useRouter} from "vue-router";
+import {useRouter,useRoute} from "vue-router";
 import {useUserStore} from "@/stores/user.js";
 import UserMenu from "@/components/navbar/UserMenu.vue";
+import {ref, watch} from "vue";
 
 const user = useUserStore()
+const searchQuery = ref()
+const router = useRouter()
+const route = useRoute()
 // 侧栏三个入口：路径、图标、文案、折叠时的提示语
 const DRAWER_ITEMS = [
   { name: "homepage-index", label: "首页", icon: HomepageIcon },
   { name: "friend-index", label: "好友", icon: FriendIcon },
   { name: "create-index", label: "创作", icon: CreateIcon },
 ];
+
+watch(()=> route.query.q,newQ => {
+  searchQuery.value = newQ || ''
+})
+
+function handleSearch(){
+  router.push({
+    name:'homepage-index',
+    query:{
+      q:searchQuery.value.trim(),
+    }
+  })
+}
+
 </script>
 
 <template>
@@ -57,26 +75,31 @@ const DRAWER_ITEMS = [
              这个 grid 容器里，grid 的 justify-items:start 会把这一格钉在左边，
              auto 外边距拿不到剩余空间，搜索框会停在最左（量到 x=160，应该是 389）。 -->
         <div class="navbar-center min-w-0 flex-1 justify-center  px-2 sm:px-6">
-          <div class="join w-full max-w-2xl">
-            <input type="search" class="input join-item w-full" placeholder="搜索你感兴趣的内容">
+          <form @submit.prevent="handleSearch" class="join w-full max-w-2xl">
+            <input v-model="searchQuery" type="search" class="input join-item w-full" placeholder="搜索你感兴趣的内容">
             <!-- overflow-visible 不能删：<button> 自己也算 overflow:hidden 的一份子，
                  图标只要贴到边，缩放/取整时就会缺一块。图标组件里也放开了 svg 的。
                  图标与文字的间距写死成 gap-1.5（6px），别再让 btn 的默认 gap 参与。 -->
-            <button type="button" class="btn join-item gap-1.5 overflow-visible">
+            <button class="btn join-item gap-1.5 overflow-visible">
               <SearchIcon />
               搜索
             </button>
-          </div>
+          </form>
         </div>
         <div class="navbar-end w-auto!">
           <RouterLink v-if="user.isLogin()" :to="{name: 'create-index'}" active-class="btn-active" class="btn btn-ghost text-base mr-6">
             <CreateIcon />
             创作
           </RouterLink>
+          <!-- ★ 必须带上 user.id 这个条件 ★
+               刷新 token 成功时只 setAccessToken，用户信息是随后才拉到的，
+               中间有一瞬 isLogin() 为 true 而 id 还是 undefined。
+               UserMenu 里的 RouterLink 要 params.user_id，拿到 undefined 会让
+               vue-router 抛 "Missing required param"，整个 Navbar 渲染中断。 -->
           <RouterLink v-if="!user.isLogin()"  :to="{name: 'login-index'}" active-class="btn-active" class="btn btn-ghost btn-sm text-base">
             登录
           </RouterLink>
-          <UserMenu v-else />
+          <UserMenu v-if="user.isLogin() && user.id" />
         </div>
       </nav>
 

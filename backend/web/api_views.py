@@ -4,17 +4,23 @@
 - TokenObtainPairView  -> 登录(走 web.serializers.LoginSerializer,响应多带 user)
 - TokenRefreshView     -> 无感刷新的服务端一半(旋转 + 拉黑由 SIMPLE_JWT 配置决定)
 - APIView              -> 登出(把 refresh 拉黑,服务端真正失效)
+
+聊天部分有两条路:
+- POST /conversations/{id}/messages/   一次性返回(简单,但用户要空等)
+- POST /conversations/{id}/stream/     流式返回 SSE(首字延迟低,推荐前端用这条)
 """
 
+import json
 from pathlib import Path
 
 from django.conf import settings
 from django.db.models import Count
-from django.http import HttpResponse
+from django.http import HttpResponse, StreamingHttpResponse
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.renderers import BaseRenderer
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.exceptions import TokenError
@@ -22,7 +28,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 from . import llm
-from .models import Conversation, Message
+from .models import Character, Conversation, Message
 from .serializers import (
     ConversationDetailSerializer,
     ConversationSerializer,
@@ -35,6 +41,17 @@ TOKEN_COOKIE = 'refresh_token'
 
 # refresh token 过期时间,和 SIMPLE_JWT['REFRESH_TOKEN_LIFETIME'] 保持一致
 REFRESH_MAX_AGE = 7 * 24 * 3600
+
+
+class SSERenderer(BaseRenderer):
+    """SSE 不需要 DRF 帮忙序列化 —— 流里已经是拼好的 text/event-stream 帧。"""
+
+    media_type = 'text/event-stream'
+    format = 'txt'
+    charset = 'utf-8'
+
+    def render(self, data, accepted_media_type=None, renderer_context=None):
+        return data
 
 
 def _set_refresh_cookie(response, refresh_token):
@@ -151,11 +168,12 @@ class ChatViewSet(viewsets.ModelViewSet):
 
     路由(DefaultRouter 生成):
         GET    /api/conversations/                列表
-        POST   /api/conversations/                新建
+        POST   /api/conversations/                新建 {title?, character?}
         GET    /api/conversations/{id}/           详情(含全部消息)
         PATCH  /api/conversations/{id}/           改标题
         DELETE /api/conversations/{id}/           删除
-        POST   /api/conversations/{id}/messages/  发一条消息,拿回 AI 回复
+        POST   /api/conversations/{id}/messages/  发一条消息,拿回 AI 回复(一次性)
+        POST   /api/conversations/{id}/stream/    发一条消息,SSE 流式返回
     """
 
     permission_classes = [IsAuthenticated]
@@ -167,6 +185,7 @@ class ChatViewSet(viewsets.ModelViewSet):
         return (
             Conversation.objects
             .filter(user=self.request.user)
+            .select_related('character')
             .annotate(message_count=Count('messages'))
         )
 
@@ -178,7 +197,15 @@ class ChatViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         # user 由服务端填,不接受客户端传 —— 否则能伪造别人的会话
+        # character 也必须校验归属:不能绑到别人的角色上
+        character = serializer.validated_data.get('character')
+        if character is not None and character.author.user_id != self.request.user.id:
+            raise AuthenticationFailed('这个角色不属于你')
         serializer.save(user=self.request.user)
+
+    # ─────────────────────────────────────────────────────────────────────
+    # 发消息(非流式)
+    # ─────────────────────────────────────────────────────────────────────
 
     @action(detail=True, methods=['post'], url_path='messages')
     def messages(self, request, pk=None):
@@ -215,6 +242,63 @@ class ChatViewSet(viewsets.ModelViewSet):
             },
             status=status.HTTP_201_CREATED,
         )
+
+    # ─────────────────────────────────────────────────────────────────────
+    # 发消息(SSE 流式)
+    # ─────────────────────────────────────────────────────────────────────
+
+    @action(detail=True, methods=['post'], url_path='stream')
+    def stream(self, request, pk=None):
+        """POST /api/conversations/{id}/stream/  {content: "..."}
+
+        返回 SSE 帧:
+            data: {"content": "你"}
+            data: {"content": "好"}
+            data: {"error": "..."}       # 出错时
+            data: [DONE]
+        """
+        self.renderer_classes = [SSERenderer]
+
+        conversation = self.get_object()
+        content = (request.data.get('content') or '').strip()
+        if not content:
+            return Response({'detail': 'content 不能为空'}, status=status.HTTP_400_BAD_REQUEST)
+
+        Message.objects.create(
+            conversation=conversation,
+            role=Message.ROLE_USER,
+            content=content,
+        )
+        if conversation.title == '新对话':
+            conversation.title = content[:20]
+            conversation.save(update_fields=['title'])
+
+        def event_stream():
+            parts = []
+            try:
+                for delta in llm.chat_stream(conversation):
+                    parts.append(delta)
+                    yield f'data: {json.dumps({"content": delta}, ensure_ascii=False)}\n\n'
+            except llm.LLMUnavailable as exc:
+                yield f'data: {json.dumps({"error": str(exc)}, ensure_ascii=False)}\n\n'
+            except Exception as exc:              # 兜底,绝不让流带着异常断掉
+                yield f'data: {json.dumps({"error": f"服务端错误：{exc}"}, ensure_ascii=False)}\n\n'
+
+            full = ''.join(parts)
+            if full:
+                Message.objects.create(
+                    conversation=conversation,
+                    role=Message.ROLE_ASSISTANT,
+                    content=full,
+                )
+            conversation.save(update_fields=['updated_at'])
+            yield 'data: [DONE]\n\n'
+
+        response = StreamingHttpResponse(event_stream(), content_type='text/event-stream')
+        response['Cache-Control'] = 'no-cache'
+        # 关掉 Nginx 的缓冲,否则流会被攒成一整块再发(部署时才生效)
+        response['X-Accel-Buffering'] = 'no'
+        return response
 
 
 def generate_reply(conversation):

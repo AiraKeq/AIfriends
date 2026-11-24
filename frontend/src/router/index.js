@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import HomepageIndex from "@/views/homepage/HomePageIndex.vue"
 import FriendIndex from "@/views/friend/FriendIndex.vue"
 import CreateIndex from "@/views/create/CreateIndex.vue"
+import UpdateCharacter from "@/views/create/character/UpdateCharacter.vue"
 import LoginIndex from "@/views/user/account/LoginIndex.vue"
 import RegisterIndex from "@/views/user/account/RegisterIndex.vue"
 import SpaceIndex from "@/views/user/space/SpaceIndex.vue"
@@ -30,9 +31,18 @@ const router = createRouter({
       }
     },
     {
+      // 创建角色页直接渲染在创作首页（和教程一致）
       path: '/create',
       component: CreateIndex,
       name: 'create-index' ,
+      meta:{
+        needLogin : true
+      }
+    },
+    {
+      path: '/create/character/update/:character_id',
+      component: UpdateCharacter,
+      name: 'update-character',
       meta:{
         needLogin : true
       }

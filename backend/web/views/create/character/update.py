@@ -1,47 +1,67 @@
-from django.utils.timezone import now
+from django.db import transaction
+from rest_framework import status
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.permissions import IsAuthenticated
 
-from views.user import profile
-from views.utils.photo import remove_old_photo
 from web.models.character import Character
+from web.views.utils.photo import remove_old_photo
 
 
 class UpdateCharacterView(APIView):
-    permission_classer = [IsAuthenticated]
-    def post(self,request):
+    """POST /api/create/character/update/
+
+    只允许改自己的角色。字段都可选,但 name / profile 传了就不能是空的。
+    图片换了才删旧文件,且在新文件确实落盘之后才删 —— 顺序反了会丢图。
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        character_id = request.data.get('character_id')
+        name = (request.data.get('name') or '').strip()
+        profile = (request.data.get('profile') or '').strip()[:100000]
+        photo = request.FILES.get('photo')
+        background_image = request.FILES.get('background_image')
+
+        if not character_id:
+            return Response({'result': '缺少角色 ID'}, status=status.HTTP_400_BAD_REQUEST)
+        if not name:
+            return Response({'result': '名字不能为空'}, status=status.HTTP_400_BAD_REQUEST)
+        if not profile:
+            return Response({'result': '角色简介不能为空'}, status=status.HTTP_400_BAD_REQUEST)
+
         try:
-            character_id = request.data['character_id']
-            character = Character.objects.get(id=character_id,author__user=request.user)
-            name = request.data['name'].strip()[:100000]
-            photo = request.FILES.get('photo',None)
-            background_image = request.FILES.get('background_image',None)
+            # author__user=request.user 是权限边界:别人的角色查不到
+            character = Character.objects.get(id=character_id, author__user=request.user)
+        except Character.DoesNotExist:
+            return Response({'result': '角色不存在'}, status=status.HTTP_404_NOT_FOUND)
 
-            if not name:
-                return Response({
-                    'result':'名字不能为空'
-                })
-            if not profile:
-                return Response({
-                    'result':'角色简介不能为空'
-                })
-            if photo:
-                remove_old_photo(character.photo)
-                character,photo = photo
-                if background_image:
-                    remove_old_photo(character.background_image)
-                    character.background_image = background_image
-                character.name = name
-                character.profile = profile
-                character.update_time = now()
-                character.save()
-                return Response({
-                    'result':'success',
-                })
+        old_photo = character.photo if photo else None
+        old_background = character.background_image if background_image else None
 
+        character.name = name
+        character.profile = profile
+        if photo:
+            character.photo = photo
+        if background_image:
+            character.background_image = background_image
 
-        except:
-            Response({
-                'result':'系统异常，请稍后尝试'
-            })
+        with transaction.atomic():
+            character.save()
+            # 事务提交成功后再删旧文件,避免保存失败把原图删没了
+            if old_photo:
+                transaction.on_commit(lambda: remove_old_photo(old_photo))
+            if old_background:
+                transaction.on_commit(lambda: remove_old_photo(old_background))
+
+        return Response({
+            'result': 'success',
+            'character': {
+                'id': character.id,
+                'name': character.name,
+                'profile': character.profile,
+                'photo': request.build_absolute_uri(character.photo.url),
+                'background_image': request.build_absolute_uri(character.background_image.url),
+            },
+        })

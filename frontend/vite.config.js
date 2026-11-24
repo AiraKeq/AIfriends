@@ -22,6 +22,14 @@ export default defineConfig(({ command }) => ({
         emptyOutDir: true,
     },
 
+    // 开发时 Django 的媒体文件要透传，否则卡片/头像的 /media/... 会打到 5173，
+    // 变成一屏破图（后端返回的是相对路径，构建后同源才不出问题）。
+    server: {
+        proxy: {
+            '/media': 'http://127.0.0.1:8000',
+        },
+    },
+
     resolve: {
         alias: {
             '@': fileURLToPath(new URL('./src', import.meta.url)),

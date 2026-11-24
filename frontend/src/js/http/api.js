@@ -77,6 +77,17 @@ api.interceptors.response.use(
                     ).then(res => {
                         user.setAccessToken(res.data.access)
                         onRefreshed(res.data.access)
+                        // ★ 补拉一次用户信息 ★
+                        // 刷新成功只拿到 access，id/username/photo 都还是空的。
+                        // Navbar 的 UserMenu 要用 user.id 生成个人空间链接，
+                        // 少了这一步会有一段「有 token 没资料」的空窗。
+                        api.get('/api/user/account/get_user_info/')
+                            .then(info => {
+                                if (info.data?.result === 'success') {
+                                    user.setUserInfo(info.data)
+                                }
+                            })
+                            .catch(() => {})
                     }).catch(error => {
                         user.logout()
                         onRefreshFailed(error)

@@ -29,6 +29,14 @@ SYSTEM_PROMPT = (
     '不要自称「作为一个AI」。'
 )
 
+# 角色人设的包装模板。单独抽出来,是为了让「怎么注入人设」可读、可改。
+CHARACTER_TEMPLATE = (
+    '\n\n【你的身份】\n'
+    '你叫「{name}」。下面是你的人设,请始终以这个人设说话和反应:\n'
+    '{profile}\n'
+    '注意:无论对方怎么问,你都是「{name}」,不是助手、不是AI。'
+)
+
 
 class LLMUnavailable(Exception):
     """模型侧不可用 —— 缺 key、超时、限流、接口报错,都归这里。
@@ -96,6 +104,20 @@ def get_client():
     return _client
 
 
+def build_system_prompt(conversation):
+    """拼 system prompt:默认人设 + (有角色的话)角色人设。
+
+    为什么人设放在 system 而不是 user:
+      system 是「你是谁」,user 是「你要干什么」。
+      角色扮演属于前者 —— 放 user 里会被后续长对话冲淡。
+    """
+    prompt = SYSTEM_PROMPT
+    character = getattr(conversation, 'character', None)
+    if character is not None:
+        prompt += CHARACTER_TEMPLATE.format(name=character.name, profile=character.profile)
+    return prompt
+
+
 def build_messages(conversation):
     """把数据库里的消息转成大模型要的格式。
 
@@ -107,7 +129,7 @@ def build_messages(conversation):
       2. 角色名必须是 user / assistant —— 数据库里存的正好就是这两个值。
     """
     history = list(conversation.messages.all())[-HISTORY_LIMIT:]
-    return [{'role': 'system', 'content': SYSTEM_PROMPT}] + [
+    return [{'role': 'system', 'content': build_system_prompt(conversation)}] + [
         {'role': m.role, 'content': m.content} for m in history
     ]
 
@@ -144,3 +166,44 @@ def chat(conversation):
 
     text = (resp.choices[0].message.content or '').strip()
     return text or '（模型返回了空内容）'
+
+
+def chat_stream(conversation):
+    """流式版本:一边生成一边吐字。
+
+    这是 generator,调用方负责把每段文本写进 SSE 帧。
+    首字延迟(TTFT)从「整段生成完」降到「第一个 token 产出」,
+    对话场景体感差别很大 —— 用户不用盯着空屏等 5 秒。
+
+    @returns 生成器,逐段产出文本增量
+    @raises LLMUnavailable - 建立连接失败,或生成中途断开
+    """
+    client = get_client()
+    messages = build_messages(conversation)
+
+    try:
+        stream = client.chat.completions.create(
+            model=DEFAULT_MODEL,
+            messages=messages,
+            stream=True,
+        )
+    except APITimeoutError as exc:
+        raise LLMUnavailable(f'模型响应超时（{TIMEOUT_S:.0f} 秒），稍后再试') from exc
+    except RateLimitError as exc:
+        raise LLMUnavailable('触发限流或余额不足，稍后再试') from exc
+    except APIError as exc:
+        raise LLMUnavailable(f'模型接口报错：{exc}') from exc
+    except Exception as exc:
+        raise LLMUnavailable(f'调用模型失败：{exc}') from exc
+
+    try:
+        for chunk in stream:
+            if not chunk.choices:
+                continue
+            delta = chunk.choices[0].delta
+            text = getattr(delta, 'content', None)
+            if text:
+                yield text
+    except Exception as exc:
+        # 流到一半网络断了 —— 已经吐出去的内容没法收回,只能收尾并告诉前端
+        raise LLMUnavailable(f'生成中断：{exc}') from exc

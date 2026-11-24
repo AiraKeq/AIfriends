@@ -10,7 +10,11 @@
 __pycache__/
 *.py[cod]
 *.sqlite3
+# 用户上传的媒体文件不进仓库（会越滚越大）；默认头像除外，
+# 否则新 clone 的项目里一张图都显示不出来。
 /media/
+backend/media/
+!backend/media/user/photos/default.png
 
 # ── Node / 前端 ───────────────────────────────────────────────
 node_modules/
