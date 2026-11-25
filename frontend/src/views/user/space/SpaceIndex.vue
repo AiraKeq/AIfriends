@@ -12,13 +12,18 @@ const hasCharacters = ref(true)
 const sentinelRef = useTemplateRef('sentinel-ref')
 const route = useRoute()
 
-function reset() {
+function reset(){
   userProfile.value = null
   characters.value = []
   isLoading.value = false
   hasCharacters.value = true
   loadMore()
 }
+
+watch(() => route.params.user_id, () => {
+  reset()
+})
+
 
 watch(() => route.params.user_id, () => {
   reset()
