@@ -1,0 +1,11 @@
+阿里云百炼（Model Studio）是阿里云的大模型服务平台。
+
+百炼提供通义千问（Qwen）系列大模型的 API 调用能力，同时支持 DeepSeek、Llama 等第三方模型。开发者可以在百炼上开通模型服务、创建 API Key，然后通过 OpenAI 兼容接口或 DashScope SDK 调用。
+
+百炼的核心能力包括：文本生成、多模态理解、语音识别（Qwen-Audio-ASR）、语音合成（CosyVoice）、声音复刻、文本向量化（text-embedding-v4）、文档解析和智能体应用编排。
+
+在价格上，百炼为新用户提供免费额度，按 token 计费，语音识别按音频时长计费，语音合成按合成字符数计费。
+
+使用百炼的步骤：注册阿里云账号、开通百炼服务、在控制台创建 API Key、把 Key 填入环境变量 API_KEY，然后在代码里通过 https://dashscope.aliyuncs.com/compatible-mode/v1 这个 OpenAI 兼容地址调用模型。
+
+声音复刻是百炼的特色功能之一，用户上传一段 10 到 30 秒的录音，就能生成一个专属音色，之后可以用 cosyvoice-v3-flash 等模型合成该音色的语音。

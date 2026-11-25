@@ -2,6 +2,7 @@ from django.contrib import admin
 from web.models.user import UserProfile
 from web.models.character import Character
 from web.models.friend import Friend, FriendMessage
+from web.models.prompt import SystemPrompt
 
 
 @admin.register(UserProfile)
@@ -22,3 +23,10 @@ class FriendAdmin(admin.ModelAdmin):
 @admin.register(FriendMessage)
 class FriendMessageAdmin(admin.ModelAdmin):
     raw_id_fields = ('friend',)
+
+
+@admin.register(SystemPrompt)
+class SystemPromptAdmin(admin.ModelAdmin):
+    list_display = ('title', 'order_number', 'prompt')
+    list_filter = ('title',)
+    ordering = ('order_number',)

@@ -3,6 +3,8 @@ from django.urls import path, re_path
 from web.views.friend.get_list import GetlistFriendView
 from web.views.friend.get_or_create import GetOrCreateFriendView
 from web.views.friend.remove import RemoveFriendView
+from web.views.friend.message.chat.chat import MessageChatView
+from web.views.friend.message.get_history import GetHistoryView
 from web.views.homepage.index import HomepageIndexView
 from web.views.create.character.create import CreateCharacterView
 from web.views.create.character.get_list import GetListCharacterView
@@ -38,6 +40,8 @@ urlpatterns = [
     path('api/friend/get_or_create/',GetOrCreateFriendView.as_view()),
     path('api/friend/remove/',RemoveFriendView.as_view()),
     path('api/friend/get_list/',GetlistFriendView.as_view()),
+    path('api/friend/message/chat/',MessageChatView.as_view()),
+    path('api/friend/message/get_history/',GetHistoryView.as_view()),
     path('', index),
 
     # 管理后台交给 Django，前端兜底不要接住 /admin。
