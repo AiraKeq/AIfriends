@@ -7,11 +7,24 @@ import RemoveIcon from "@/components/character/icons/RemoveIcon.vue";
 import api from "@/js/http/api.js";
 import {useRouter} from "vue-router";
 
-const props = defineProps(['character', 'canEdit'])
+const props = defineProps(['character', 'canEdit','canRemoveFriend','friendId']);
 const emit = defineEmits(['remove'])
 const isHover = ref(false)
 const user = useUserStore()
 const router = useRouter()
+
+async function handleRemoveFriend () {
+  try{
+    const res = await api.post('/api/friend/remove/',{
+      friend_Id:props.friendId,
+    })
+    if(res.data.result === 'success'){
+      emit('remove',props.friendId)
+    }
+  }catch(err){
+    console.log(err)
+  }
+}
 
 async function handleRemoveCharacter() {
   try {
@@ -62,6 +75,12 @@ async function openChatField() {
             <UpdateIcon />
           </RouterLink>
           <button @click.stop="handleRemoveCharacter" class="btn btn-circle btn-ghost bg-transparent">
+            <RemoveIcon />
+          </button>
+        </div>
+
+        <div v-if="canRemoveFriend" class="absolute right-0 top-50">
+          <button @click.stop="handleRemoveFriend" class="btn btn-circle btn-ghost bg-transparent">
             <RemoveIcon />
           </button>
         </div>
