@@ -4,6 +4,7 @@
 .env
 !.env.example
 *.env
+backend/web/documents
 
 # ── Python ────────────────────────────────────────────────────
 .venv/
@@ -19,6 +20,9 @@ backend/media/
 # ── Node / 前端 ───────────────────────────────────────────────
 node_modules/
 dist/
+
+# ── VAD 模型（npm install 后手动复制，体积大，不进仓库）─────────
+frontend/public/vad/
 
 # ── 打包产物：由 npm run build 生成，不进 git ──────────────────
 backend/static/frontend/
