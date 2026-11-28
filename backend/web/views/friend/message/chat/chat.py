@@ -1,7 +1,13 @@
+import asyncio
+import base64
 import json
+import os
+import threading
+from queue import Queue
 
+import websockets
 from django.http import StreamingHttpResponse
-from langchain_core.messages import BaseMessageChunk, HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, BaseMessageChunk, HumanMessage, SystemMessage
 from langgraph.types import Command
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.renderers import BaseRenderer
@@ -33,10 +39,7 @@ def build_system_prompt(friend):
     system_prompts = SystemPrompt.objects.filter(title='回复').order_by('order_number')
     prompt = ''.join(sp.prompt for sp in system_prompts)
     prompt += f'\n【角色性格】\n{friend.character.profile}\n'
-    prompt += f'【长期记忆】\n{friend.memory or "暂无"}\n'
-    # ★ 确认门还没做，工具只是「登记」★
-    #   不加这条，模型会顺着 save_memory 的返回说「我记住了」，
-    #   而实际上一个字都没落库 —— 用户被误导，面试也会被问穿。
+    prompt += f'\n【长期记忆】\n{friend.memory or "暂无"}\n'
     prompt += (
         '\n【记忆规则】\n'
         '当工具返回里出现「待确认」时，说明这条信息还没有保存。'
@@ -46,6 +49,18 @@ def build_system_prompt(friend):
 
 
 class MessageChatView(APIView):
+    """聊天接口：文字流 + TTS 音频流，都从同一条 SSE 推给前端。
+
+    为什么是「双线程 + 汇合队列」而不是直接 astream：
+      LangGraph 的同步 checkpointer（SqliteSaver）不支持 async 方法，
+      astream 会直接抛「does not support async methods」。
+      而 websockets 只有 async API。
+      所以切成两条线程：
+        ① 生成线程：app.stream（同步）→ 文字放进 text_q 和 out_q
+        ② TTS 线程：asyncio 读 text_q → 送 TTS → 音频放进 out_q
+        主线程读 out_q，按到达顺序发 SSE。
+    """
+
     permission_classes = [IsAuthenticated]
     renderer_classes = [SSERenderer]
 
@@ -62,19 +77,11 @@ class MessageChatView(APIView):
 
         app = ChatGraph.create_app()
         config = {
-            # ★ thread_id = 这条好友关系 ★
-            #   checkpointer 按它存整段状态，断线重连能接着跑
             'configurable': {'thread_id': f'friend-{friend.id}'},
-            # 保险丝：比 MAX_TOOL_ROUNDS 大一些。撞上它是异常，不是正常收尾
             'recursion_limit': RECURSION_LIMIT,
-            # 没配 Langfuse key 时是空列表，对话不受影响
             'callbacks': build_langfuse_callbacks(),
         }
 
-        # ★ 有历史就不再塞 ★
-        #   checkpointer 已经存了完整对话；再塞一遍会重复，
-        #   而且「我刚才问了什么」这类问题会因为上下文重复而答歪。
-        #   system prompt 只在第一次对话时写入，之后跟着状态走。
         graph_state = app.get_state(config)
         has_history = bool(graph_state.values.get('messages'))
         if has_history:
@@ -97,26 +104,126 @@ class MessageChatView(APIView):
         response['X-Accel-Buffering'] = 'no'
         return response
 
-    def event_stream(self, app, inputs, config, friend, message):
-        full_output = ''
-        full_usage = {}
+    # ─────────────────────────────────────────────────────────────────
+    # 生成线程：同步跑图，文字同时进 TTS 队列和输出队列
+    # ─────────────────────────────────────────────────────────────────
 
+    def generate(self, app, inputs, config, text_q, out_q):
         try:
             for msg, metadata in app.stream(inputs, stream_mode='messages', config=config):
                 if isinstance(msg, BaseMessageChunk):
                     if msg.content:
-                        full_output += msg.content
-                        yield f'data: {json.dumps({"content": msg.content}, ensure_ascii=False)}\n\n'
+                        text_q.put(msg.content)
+                        out_q.put({'content': msg.content})
                     if getattr(msg, 'usage_metadata', None):
-                        full_usage = msg.usage_metadata
+                        out_q.put({'usage': msg.usage_metadata})
         except Exception as exc:
-            # 模型侧出错时，把话说人话推给前端，而不是让流干巴巴断掉
-            yield f'data: {json.dumps({"error": f"模型调用失败：{exc}"}, ensure_ascii=False)}\n\n'
+            print(f'[chat] 生成异常：{exc}')
+            out_q.put({'error': f'模型调用失败：{exc}'})
+        finally:
+            # 通知 TTS：文字说完了
+            text_q.put(None)
+
+    # ─────────────────────────────────────────────────────────────────
+    # TTS 线程：async WebSocket，收音频进输出队列
+    # ─────────────────────────────────────────────────────────────────
+
+    def tts_worker(self, text_q, out_q):
+        try:
+            asyncio.run(self.tts_loop(text_q, out_q))
+        except Exception as exc:
+            print(f'[chat] TTS 线程异常：{exc}')
+        finally:
+            out_q.put(None)
+
+    async def tts_loop(self, text_q, out_q):
+        api_key = os.getenv('API_KEY') or os.getenv('DEEPSEEK_API_KEY')
+        tts_url = os.getenv('TTS_URL', 'wss://api.deepseek.com/v1/tools/tts')
+        # DeepSeek 只有两个内置音色；角色音色系统还没做，先用默认
+        voice = 'stella'
+        url = f'{tts_url}?voice_id={voice}&format=pcm'
+        headers = {'Authorization': f'Bearer {api_key}'}
+
+        try:
+            ws = await websockets.connect(url, additional_headers=headers)
+        except Exception as exc:
+            print(f'[chat] TTS 连接失败，降级为纯文字：{exc}')
+            # ★ 必须等文字排空再退出 ★
+            #   提前 return 会让 tts_worker 立刻往 out_q 塞结束哨兵，
+            #   主线程就会在文字还没生成完时收尾 —— 回复被截断。
+            while True:
+                text = await asyncio.to_thread(text_q.get)
+                if text is None:
+                    break
+            return
+
+        async with ws:
+            await asyncio.gather(
+                self.tts_sender_loop(text_q, ws),
+                self.tts_receiver_loop(out_q, ws),
+            )
+
+    async def tts_sender_loop(self, text_q, ws):
+        while True:
+            # Queue.get 是阻塞的，丢进线程池免得堵住事件循环
+            text = await asyncio.to_thread(text_q.get)
+            if text is None:
+                await ws.send(json.dumps({'event': 'finish_text'}))
+                break
+            await ws.send(json.dumps({'event': 'text', 'text': text}))
+
+    async def tts_receiver_loop(self, out_q, ws):
+        async for msg in ws:
+            if isinstance(msg, bytes):
+                audio = base64.b64encode(msg).decode('utf-8')
+                out_q.put({'audio': audio})
+            else:
+                data = json.loads(msg)
+                if data.get('event') == 'finish':
+                    if data.get('code') != 'success':
+                        print(f'[chat] TTS 结束：{data}')
+                    break
+
+    # ─────────────────────────────────────────────────────────────────
+    # SSE 主循环
+    # ─────────────────────────────────────────────────────────────────
+
+    def event_stream(self, app, inputs, config, friend, message):
+        text_q = Queue()
+        out_q = Queue()
+
+        gen_thread = threading.Thread(
+            target=self.generate,
+            args=(app, inputs, config, text_q, out_q),
+        )
+        tts_thread = threading.Thread(
+            target=self.tts_worker,
+            args=(text_q, out_q),
+        )
+        gen_thread.start()
+        tts_thread.start()
+
+        full_output = ''
+        full_usage = {}
+
+        while True:
+            item = out_q.get()
+            if item is None:
+                break
+            if item.get('content'):
+                full_output += item['content']
+                yield f'data: {json.dumps({"content": item["content"]}, ensure_ascii=False)}\n\n'
+            if item.get('audio'):
+                yield f'data: {json.dumps({"audio": item["audio"]}, ensure_ascii=False)}\n\n'
+            if item.get('usage'):
+                full_usage = item['usage']
+            if item.get('error'):
+                yield f'data: {json.dumps({"error": item["error"]}, ensure_ascii=False)}\n\n'
+
+        gen_thread.join(timeout=5)
+        tts_thread.join(timeout=5)
 
         # ★ 检查确认门（必须在 [DONE] 之前）★
-        #   interrupt 之后 stream 会自然结束，这里从快照里把待确认的事捞出来，
-        #   推一条独立事件给前端。前端据此弹「要不要记住」。
-        #   顺序反了的话，前端一收到 [DONE] 就把这条流当作结束，确认框永远不会弹。
         try:
             snapshot = app.get_state(config)
             pending = []
@@ -126,7 +233,6 @@ class MessageChatView(APIView):
             if pending:
                 yield f'data: {json.dumps({"event": "interrupt", "payload": pending[0]}, ensure_ascii=False)}\n\n'
         except Exception as exc:
-            # 查中断失败不该让整个回复失败
             print(f'[chat] 检查中断失败：{exc}')
 
         yield 'data: [DONE]\n\n'
@@ -159,15 +265,13 @@ class MessageResumeView(APIView):
     确认门的另一半：用户点了「要记住 / 不用」之后，带着决定恢复图。
 
     ★ 恢复时不要带 steps ★
-      Command(resume=...) 只传决定；带 steps 会把确认前的步数清掉，
-      于是恢复后模型又能调一轮工具，步数上限就形同虚设。
+      Command(resume=...) 只传决定；带 steps 会把确认前的步数清掉。
     """
 
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
         friend_id = request.data.get('friend_id')
-        # 前端传布尔或字符串都认
         approve = request.data.get('approve')
         approve = approve if isinstance(approve, bool) else str(approve).lower() in ('1', 'true', 'yes')
 
@@ -189,11 +293,7 @@ class MessageResumeView(APIView):
             return Response({'result': f'恢复失败：{exc}'})
 
         messages = result.get('messages') or []
-        # ★ 取最后一条有正文的 AIMessage ★
-        #   resume 之后状态末尾可能是 ToolMessage（"待确认"那段），
-        #   直接拿 messages[-1] 会把工具输出当成模型回复返回给前端。
-        from langchain_core.messages import AIMessage
-
+        # 取最后一条有正文的 AIMessage：resume 之后状态末尾可能是 ToolMessage
         ai_messages = [
             m for m in messages
             if isinstance(m, AIMessage) and (m.content or '').strip()
